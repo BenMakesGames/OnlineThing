@@ -34,10 +34,24 @@ public record ClientCommand(Guid PlayerId, byte Type, IClientCommandData Data)
 
         return true;
     }
+
+    public byte[] ToByteArray()
+    {
+        var data = Data.ToByteArray();
+        var bytes = new byte[17 + data.Length];
+        var byteSpan = (Span<byte>) bytes;
+        PlayerId.TryWriteBytes(bytes);
+        bytes[16] = Type;
+        data.CopyTo(byteSpan[17..]);
+        return bytes;
+    }
 }
 
 public interface IClientCommandData
 {
+    static abstract byte Type { get; }
+    byte[] ToByteArray();
+
     // some commands have empty data; for such commands, this method can be used
     protected static bool ParseEmpty<T>(Span<byte> bytes, out IClientCommandData data) where T : IClientCommandData, new()
     {
@@ -54,22 +68,37 @@ public interface IClientCommandData
     }
 }
 
-public sealed record InvalidClientCommand: IClientCommandData;
+public sealed record InvalidClientCommand : IClientCommandData
+{
+    public static byte Type => 0;
+
+    public byte[] ToByteArray() => Array.Empty<byte>();
+}
 
 public sealed record DisconnectClientCommand: IClientCommandData
 {
+    public static byte Type => ClientCommand.Disconnect;
+
     public static bool TryParse(Span<byte> bytes, out IClientCommandData clientCommand)
         => IClientCommandData.ParseEmpty<DisconnectClientCommand>(bytes, out clientCommand);
+
+    public byte[] ToByteArray() => Array.Empty<byte>();
 }
 
 public sealed record StopMovingClientCommand: IClientCommandData
 {
+    public static byte Type => ClientCommand.StopMoving;
+
     public static bool TryParse(Span<byte> bytes, out IClientCommandData clientCommand)
         => IClientCommandData.ParseEmpty<StopMovingClientCommand>(bytes, out clientCommand);
+
+    public byte[] ToByteArray() => Array.Empty<byte>();
 }
 
 public sealed record StartMovingClientCommand(byte Angle) : IClientCommandData
 {
+    public static byte Type => ClientCommand.StartMoving;
+
     public static bool TryParse(Span<byte> bytes, out IClientCommandData clientCommand)
     {
         if(bytes.Length != 1)
@@ -83,4 +112,6 @@ public sealed record StartMovingClientCommand(byte Angle) : IClientCommandData
 
         return true;
     }
+
+    public byte[] ToByteArray() => new[] { Angle };
 }
